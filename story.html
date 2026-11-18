@@ -201,7 +201,7 @@ const NS = 'http://www.w3.org/2000/svg';
 const M = ['Local-only', 'Federated', 'Personalized FL', 'Centralized'];
 const ML = ['Alone', 'Flower', 'Personal', 'Pooled'];
 const MC = ['var(--steel)', 'var(--accent)', '#7d94ee', 'var(--ink)'];
-const pct = v => (v >= 99.95 ? '100' : (Math.round(v * 10) / 10).toFixed(1)) + '%';
+const pct = v => (v === 100 ? '100' : (Math.floor(v * 100) / 100).toFixed(2)) + '%';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const raf2 = f => requestAnimationFrame(() => requestAnimationFrame(f));
 

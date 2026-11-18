@@ -155,7 +155,8 @@ const D = window.DATA, $ = (s, r = document) => r.querySelector(s), $$ = (s, r =
 const M = ['Local-only', 'Federated', 'Personalized FL', 'Centralized'];
 const ML = ['Alone', 'Flower', 'Personal', 'Pooled'];
 const MC = ['var(--steel)', 'var(--accent)', '#7d94ee', 'var(--ink)'];
-const pct = v => (v >= 99.95 ? '100' : (Math.round(v * 10) / 10).toFixed(1)) + '%';
+// exact: 100% only when every test window was right; otherwise two decimals, never rounded up to 100
+const pct = v => (v === 100 ? '100' : (Math.floor(v * 100) / 100).toFixed(2)) + '%';
 const raf2 = f => requestAnimationFrame(() => requestAnimationFrame(f));
 
 /* ---------- chart builders (all numbers from the 45 Flower runs in data.js) ---------- */
@@ -227,7 +228,7 @@ const V = {
   curve: (() => { const ys = D.scenarios.baseline.fl_curve, xs = ys.map((_, i) => i + 1), loc = D.scenarios.baseline.members['Local-only'];
     return { html: `<h4>Shared-model accuracy · plants A–D</h4>` + lineSVG({ w: 540, h: 280, pad: { l: 44, r: 10, t: 14, b: 34 }, xs, xticks: [1, 5, 10, 15, 20, 25, 30], xlab: 'round',
       series: [{ ys, color: 'var(--accent)', width: 4, area: true }], ymin: 40, ymax: 100, yticks: [[40, '40%'], [60, '60%'], [80, '80%'], [100, '100%']], ref: { v: loc, label: 'each plant alone · ' + pct(loc) } }) + `<div class="cap">Round 1: ${pct(ys[0])} · Round 4: ${pct(ys[3])} · mean of five seeds</div>`, play: playLines }; })(),
-  result: { html: `<h4>Baseline test · average of plants A–D</h4>` + hbars(M.map((m, i) => [ML[i], D.scenarios.baseline.members[m], MC[i]])) + `<div class="cap">Five seeds, identical scores every time.</div>`, play: playBars },
+  result: { html: `<h4>Baseline test · average of plants A–D</h4>` + hbars(M.map((m, i) => [ML[i], D.scenarios.baseline.members[m], MC[i]])) + `<div class="cap">Flower: <b>1,540 of 1,540</b> test windows correct (308 per run × 5 seeds). “Alone” is the average of the four plants’ own scores.</div>`, play: playBars },
   plantC: { html: `<h4>Plant C · outer-race fault windows</h4>${dotsHTML(14, 7)}<div class="mini">Alone <b>0 / 14</b> → with Flower <b style="color:var(--accent)">14 / 14</b></div>`, play: el => playDots(el, 0, 14) },
   plantE: { html: `<h4>Plant E · four-class test on day one</h4>${dotsHTML(32, 8)}<div class="mini">Alone <b>8 / 32</b> → with Flower <b style="color:var(--accent)">32 / 32</b></div>`, play: el => playDots(el, 8, 32) },
   heat: (() => {
@@ -266,7 +267,7 @@ const Q = [
   { q: 'How many rounds until the shared model is <em>good</em>?', c: ['About 4', 'About 30', 'About 100'], a: 0, vis: 'curve',
     big: '4 rounds', why: `From a coin flip (${pct(D.scenarios.baseline.fl_curve[0])}) to <b>${pct(D.scenarios.baseline.fl_curve[3])}</b> by round 4.` },
   { q: 'Does learning together beat learning <em>alone</em>?', c: ['Yes, by a lot', 'A little', 'No'], a: 0, vis: 'result',
-    big: `${pct(base['Local-only'])} → ${pct(base.Federated)}`, why: 'Average plant accuracy on the baseline test. Together it matches pooling all the data in one place.' },
+    big: `${pct(base['Local-only'])} → ${pct(base.Federated)}`, why: 'Average plant accuracy on the baseline test. The 100% is exact: <b>1,540 of 1,540</b> test windows right across five seeds, the same as pooling all the data in one place.' },
   { q: 'Can a plant catch a fault it has <em>never</em> seen?', c: ['Yes', 'No'], a: 0, vis: 'plantC',
     big: '0 → 14 of 14', why: 'Plant C had no outer-race examples. After Flower training it caught <b>every one</b>, learned from plants B and D.' },
   { q: 'Can a <em>brand-new</em> plant be useful on day one?', c: ['Yes', 'No'], a: 0, vis: 'plantE',
@@ -304,7 +305,7 @@ function build() {
     else if (q.final) el.innerHTML = `<div class="final"><div class="num"><b>Done</b></div><h2>You scored</h2><div class="bigscore" id="fs"></div>
         <p style="color:var(--muted);max-width:420px;line-height:1.5">Five virtual plants, one shared model, 45 Flower simulations. A strong lab result with an honest weak spot.</p>
         <div class="links"><a href="https://flower.ai" target="_blank" rel="noopener">Flower ↗</a><a href="https://engineering.case.edu/bearingdatacenter" target="_blank" rel="noopener">CWRU data ↗</a><a href="#" id="again">↺ Start again</a></div></div>
-        <div class="right"><div class="vis"><div class="inner">${hbars(M.map((m, i) => [ML[i], base[m], MC[i]]))}<div class="cap">Baseline accuracy, the headline result.</div></div></div></div>`;
+        <div class="right"><div class="vis"><div class="inner">${hbars(M.map((m, i) => [ML[i], base[m], MC[i]]))}<div class="cap">Baseline accuracy, the headline result · Flower: 1,540 of 1,540 windows correct.</div></div></div></div>`;
     else el.innerHTML = `<div class="left"><div class="num"><b>Question ${String(i).padStart(2, '0')}</b> / ${Q.length}</div><h2>${q.q}</h2>
         <div class="choices">${q.c.map((o, k) => `<button class="choice" data-i="${k}">${o}</button>`).join('')}</div>
         <button class="skip">Just show me</button><div class="answer"></div></div>
