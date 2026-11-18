@@ -1,0 +1,156 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#f7f9fc}canvas{display:block;width:100vw;height:auto}</style>
+</head><body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Seamless 8 s loop. Every motion has a period that divides T.
+const T = 8, W = 1920, H = 1080, TAU = Math.PI * 2;
+const c = document.getElementById('c'), x = c.getContext('2d');
+const BLUE = [31, 79, 216], INK = [13, 27, 51];
+const rgba = (a, al) => `rgba(${a[0]},${a[1]},${a[2]},${al})`;
+const ease = u => u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+
+function metal(cx, cy, r0, r1, rot, tint) {
+  // brushed steel ring: conic gradient fixed to the light, faint tint
+  const g = x.createConicGradient(-0.9 + rot * 0, cx, cy);
+  const stops = tint
+    ? ['#dfe6f5', '#ffffff', '#aebbd6', '#eef2fb', '#8796b8', '#f4f6fc', '#b9c4de', '#dfe6f5']
+    : ['#d9dee6', '#ffffff', '#a9b2c0', '#eceff4', '#8c96a6', '#f6f7f9', '#b8c0cc', '#d9dee6'];
+  stops.forEach((s, i) => g.addColorStop(i / (stops.length - 1), s));
+  x.beginPath(); x.arc(cx, cy, r0, 0, TAU); x.arc(cx, cy, r1, 0, TAU, true);
+  x.fillStyle = g; x.fill();
+  // edge lines
+  x.lineWidth = 1.5; x.strokeStyle = 'rgba(13,27,51,.18)';
+  x.beginPath(); x.arc(cx, cy, r0, 0, TAU); x.stroke();
+  x.beginPath(); x.arc(cx, cy, r1, 0, TAU); x.stroke();
+}
+
+function ball(bx, by, r) {
+  const g = x.createRadialGradient(bx - r * .38, by - r * .42, r * .08, bx, by, r);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(.35, '#dfe4ec'); g.addColorStop(.8, '#7d889b'); g.addColorStop(1, '#5d687c');
+  x.beginPath(); x.arc(bx, by, r, 0, TAU); x.fillStyle = g; x.fill();
+  x.lineWidth = 1; x.strokeStyle = 'rgba(13,27,51,.25)'; x.stroke();
+}
+
+function draw(t) {
+  const p = (t % T) / T;                     // 0..1 loop phase
+  x.clearRect(0, 0, W, H);
+
+  // background: ice wash + soft radial light behind the bearing
+  const bg = x.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#f2f6fd'); bg.addColorStop(1, '#f7f9fc');
+  x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  const cx = 1410 + 10 * Math.sin(TAU * p), cy = 470 + 6 * Math.cos(TAU * p);
+  const glow = x.createRadialGradient(cx, cy, 60, cx, cy, 760);
+  glow.addColorStop(0, 'rgba(111,143,240,.20)'); glow.addColorStop(1, 'rgba(111,143,240,0)');
+  x.fillStyle = glow; x.fillRect(0, 0, W, H);
+
+  // fine engineering grid
+  x.strokeStyle = 'rgba(13,27,51,.045)'; x.lineWidth = 1;
+  for (let gx = 0; gx <= W; gx += 60) { x.beginPath(); x.moveTo(gx + .5, 0); x.lineTo(gx + .5, H); x.stroke(); }
+  for (let gy = 0; gy <= H; gy += 60) { x.beginPath(); x.moveTo(0, gy + .5); x.lineTo(W, gy + .5); x.stroke(); }
+
+  // vibration traces flowing through the scene (periods divide the loop)
+  for (let k = 0; k < 3; k++) {
+    const yb = cy + 40 + k * 26, amp = 34 - k * 9;
+    x.beginPath();
+    for (let px = 0; px <= W; px += 3) {
+      const u = px / W;
+      let y = Math.sin(TAU * (u * 9 - p * 2) + k) * .45
+            + Math.sin(TAU * (u * 23 - p * 4) + k * 2) * .25
+            + Math.sin(TAU * (u * 61 - p * 8)) * .12;
+      // periodic fault impulses travelling left → right
+      for (let j = 0; j < 4; j++) {
+        const d = ((u - (j / 4 + p)) % 1 + 1) % 1;
+        y += Math.exp(-d * 90) * Math.sin(d * 420) * 1.6 * (d < .08 ? 1 : 0);
+      }
+      const fade = Math.min(1, u * 3) * Math.min(1, (1 - u) * 6);
+      const yy = yb + y * amp * fade;
+      px ? x.lineTo(px, yy) : x.moveTo(px, yy);
+    }
+    x.strokeStyle = rgba(BLUE, [.55, .28, .15][k]); x.lineWidth = [2.2, 1.6, 1.2][k]; x.stroke();
+  }
+
+  // federation: five plant nodes on an orbit, updates pulse to the hub and back
+  const R = 470, names = 'ABCDE';
+  const nodes = [...names].map((n, i) => {
+    const a = -Math.PI / 2 + (i - 2) * 0.55 + Math.PI * (i > 2 ? 0.0 : 0);
+    const ang = [-2.55, -1.95, -1.2, -0.45, 0.35][i];
+    return [n, cx + Math.cos(ang) * R, cy + Math.sin(ang) * R * .82];
+  });
+  nodes.forEach(([n, nx, ny], i) => {
+    x.setLineDash([3, 7]); x.strokeStyle = rgba(BLUE, .25); x.lineWidth = 1.5;
+    x.beginPath(); x.moveTo(nx, ny); x.lineTo(cx, cy); x.stroke(); x.setLineDash([]);
+    // two pulses per loop per node, staggered
+    for (let j = 0; j < 2; j++) {
+      const q = ((p * 2 + i / 5 + j * .0) % 1);
+      const inbound = q < .5, s = ease(inbound ? q * 2 : (q - .5) * 2);
+      const fx = inbound ? nx + (cx - nx) * s * .62 : cx + (nx - cx) * (.62 + .38 * s) - (nx - cx) * .62 * 0;
+      const fy = inbound ? ny + (cy - ny) * s * .62 : cy + (ny - cy) * (.62 + .38 * s);
+      if (j === 1) break;
+      const alpha = Math.sin(Math.PI * (inbound ? s : s)) * .95;
+      x.save(); x.shadowColor = rgba(BLUE, .6 * alpha); x.shadowBlur = 18;
+      x.beginPath(); x.arc(fx, fy, inbound ? 10 : 8, 0, TAU);
+      x.fillStyle = inbound ? rgba(BLUE, alpha) : `rgba(111,143,240,${alpha})`; x.fill(); x.restore();
+    }
+  });
+
+  // bearing
+  const ro = 330, ri_o = 262, ii_o = 168, ii_i = 108, pitch = 215, nb = 10, rb = 44;
+  // soft shadow
+  x.save(); x.shadowColor = 'rgba(13,27,51,.18)'; x.shadowBlur = 70; x.shadowOffsetY = 30;
+  x.beginPath(); x.arc(cx, cy, ro, 0, TAU); x.fillStyle = '#eef2f8'; x.fill(); x.restore();
+  metal(cx, cy, ro, ri_o, 0, false);
+  // raceway groove
+  x.beginPath(); x.arc(cx, cy, ri_o, 0, TAU); x.arc(cx, cy, ii_o, 0, TAU, true);
+  const race = x.createRadialGradient(cx, cy, ii_o, cx, cy, ri_o);
+  race.addColorStop(0, '#c9d2e1'); race.addColorStop(.5, '#eef2f8'); race.addColorStop(1, '#c3ccdc');
+  x.fillStyle = race; x.fill();
+  // cage + balls orbit one ball spacing per loop (seamless)
+  const cageA = p * TAU / nb;
+  x.strokeStyle = rgba(BLUE, .85); x.lineWidth = 7;
+  x.beginPath(); x.arc(cx, cy, pitch, 0, TAU); x.stroke();
+  for (let i = 0; i < nb; i++) {
+    const a = cageA + i * TAU / nb;
+    ball(cx + Math.cos(a) * pitch, cy + Math.sin(a) * pitch, rb);
+  }
+  metal(cx, cy, ii_o, ii_i, 0, true);
+  // inner-ring markings rotate one sixth per loop
+  const inA = p * TAU / 6;
+  for (let i = 0; i < 6; i++) {
+    const a = inA + i * TAU / 6;
+    x.beginPath(); x.arc(cx + Math.cos(a) * 138, cy + Math.sin(a) * 138, 6, 0, TAU);
+    x.fillStyle = 'rgba(13,27,51,.22)'; x.fill();
+  }
+  // bore: hub glow (the shared model)
+  const hub = x.createRadialGradient(cx, cy, 10, cx, cy, ii_i);
+  const pulse = .5 + .5 * Math.cos(TAU * p * 2);
+  hub.addColorStop(0, rgba(BLUE, .95)); hub.addColorStop(.7, rgba(BLUE, .78 + .1 * pulse)); hub.addColorStop(1, 'rgba(31,79,216,.6)');
+  x.beginPath(); x.arc(cx, cy, ii_i, 0, TAU); x.fillStyle = hub; x.fill();
+  x.beginPath(); x.arc(cx, cy, ii_i + 14 + 26 * (1 - pulse), 0, TAU);
+  x.strokeStyle = rgba(BLUE, .25 * pulse); x.lineWidth = 3; x.stroke();
+  // tiny flower glyph in the hub
+  for (let i = 0; i < 6; i++) {
+    const a = i * TAU / 6 + p * TAU / 6;
+    x.beginPath(); x.ellipse(cx + Math.cos(a) * 22, cy + Math.sin(a) * 22, 18, 9, a, 0, TAU);
+    x.fillStyle = 'rgba(255,255,255,.85)'; x.fill();
+  }
+  x.beginPath(); x.arc(cx, cy, 10, 0, TAU); x.fillStyle = '#fff'; x.fill();
+
+  // plant nodes on top
+  nodes.forEach(([n, nx, ny], i) => {
+    const q = (p * 2 + i / 5) % 1, hit = Math.max(0, 1 - Math.abs(q - .5) * 8);
+    x.save(); x.shadowColor = 'rgba(13,27,51,.12)'; x.shadowBlur = 24; x.shadowOffsetY = 8;
+    x.beginPath(); x.roundRect(nx - 40, ny - 40, 80, 80, 22); x.fillStyle = '#fff'; x.fill(); x.restore();
+    x.lineWidth = 2; x.strokeStyle = rgba(BLUE, .15 + .6 * hit); x.stroke();
+    x.fillStyle = rgba(INK, 1); x.font = '400 44px "Instrument Serif", Georgia, serif';
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(n, nx, ny + 2);
+  });
+}
+window.draw = draw; window.T = T;
+document.fonts.load('44px "Instrument Serif"').finally(() => { draw(0); window.ready = true; });
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet">
+</body></html>
